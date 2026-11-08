@@ -1,0 +1,5 @@
+bench/fib
+bench/sieve
+bench/fib0
+*.o
+__pycache__/
