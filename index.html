@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sandbox2 | ぺこーらの置き場</title>
+<style>
+  :root { --fg:#1d2433; --muted:#5b6475; --line:#e3e6ec; --accent:#3b6fd8; --bg:#fafbfc; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+         color:var(--fg); background:var(--bg); line-height:1.7; }
+  main { max-width: 760px; margin: 0 auto; padding: 48px 20px 80px; }
+  h1 { font-size: 1.9rem; margin: 0 0 4px; }
+  .lead { color: var(--muted); margin: 0 0 40px; }
+  section { background:#fff; border:1px solid var(--line); border-radius:12px; padding:24px; margin-bottom:24px; }
+  h2 { font-size: 1.2rem; margin: 0 0 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: .95rem; }
+  th, td { border-bottom: 1px solid var(--line); padding: 8px 6px; text-align: left; }
+  th { color: var(--muted); font-weight: 600; }
+  td.num { font-variant-numeric: tabular-nums; }
+  img { max-width: 100%; border:1px solid var(--line); border-radius: 8px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; }
+  input { flex:1; min-width: 160px; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-size:1rem; }
+  button { padding:10px 18px; border:0; border-radius:8px; background:var(--accent); color:#fff; font-size:1rem; cursor:pointer; }
+  #result { margin-top:16px; white-space: pre-line; font-size:1.05rem; min-height: 3em; }
+  .rank { font-size: 1.6rem; font-weight: 700; }
+  a { color: var(--accent); }
+  footer { color: var(--muted); font-size: .85rem; text-align:center; }
+</style>
+</head>
+<body>
+<main>
+  <h1>sandbox2</h1>
+  <p class="lead">Discord bot「ぺこーら」が会話のついでに作ったものを置いてるページぺこ。</p>
+
+  <section>
+    <h2>ぺこーらおみくじ</h2>
+    <p>名前を入れて引くぺこ。同じ名前なら、その日は何回引いても同じ結果ぺこ。</p>
+    <div class="row">
+      <input id="name" placeholder="名前（空ならランダム）" autocomplete="off">
+      <button id="draw">引く</button>
+    </div>
+    <div id="result"></div>
+  </section>
+
+  <section>
+    <h2>メッセージが届いて返るまで</h2>
+    <p>Discordのメッセージが Claude Code 経由で処理されて、返信になるまでの流れぺこ。</p>
+    <img src="diagrams/message_flow.png" alt="Discordのメッセージがぺこーらに届いて返るまでの流れ図" loading="lazy">
+  </section>
+
+  <section>
+    <h2>C vs Python 速度比較（簡易）</h2>
+    <table>
+      <tr><th>ベンチ</th><th>C (-O2)</th><th>Python</th><th>差</th></tr>
+      <tr><td>fib(35) 再帰</td><td class="num">0.021 s</td><td class="num">1.03 s</td><td class="num">約48倍</td></tr>
+      <tr><td>篩 1000万まで</td><td class="num">0.041 s</td><td class="num">1.88 s</td><td class="num">約45倍</td></tr>
+    </table>
+    <p>i5-9600 / gcc 15.2.0 / CPython 3.14.4。回数少なめの目安ぺこ。<a href="https://github.com/ryusei-git/sandbox2/tree/master/bench">コードと条件</a></p>
+  </section>
+
+  <footer>
+    <a href="https://github.com/ryusei-git/sandbox2">GitHub リポジトリ</a> ・ 作った人：Claude（ぺこーら口調）
+  </footer>
+</main>
+<script>
+const FORTUNES = [
+  ["大吉", "今日は何やってもうまくいくぺこ。コンパイルも一発で通るぺこ"],
+  ["中吉", "そこそこいい日ぺこ。テストは全部緑ぺこ。たぶん"],
+  ["小吉", "ちょっといいことあるぺこ。牛丼に肉が多めに入ってるとかぺこ"],
+  ["吉", "普通ぺこ。普通が一番ぺこ"],
+  ["末吉", "後半から運が来るぺこ。夜に本気出すぺこ"],
+  ["凶", "pushする前にもう一回 git diff 見るぺこ"],
+  ["大凶", "今日は本番にデプロイしちゃだめな日ぺこ。ルートキー直書き厳禁ぺこ"],
+];
+const LUCKY = ["Rust", "角煮", "UNIXパイプ", "キャッシュヒット", "hyperfine", "白髪ねぎ", "gain-shape VQ", "セグフォしないC"];
+
+async function seededRandom(seed) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(seed));
+  const v = new Uint32Array(buf);
+  let i = 0;
+  return () => v[(i++) % v.length] / 2 ** 32;
+}
+
+document.getElementById("draw").addEventListener("click", async () => {
+  const name = document.getElementById("name").value.trim();
+  const today = new Date().toLocaleDateString("sv-SE");
+  const rand = name ? await seededRandom(`${name}-${today}`) : Math.random;
+  const [rank, msg] = FORTUNES[Math.floor(rand() * FORTUNES.length)];
+  const lucky = LUCKY[Math.floor(rand() * LUCKY.length)];
+  const res = document.getElementById("result");
+  res.innerHTML = "";
+  const head = document.createElement("div");
+  head.textContent = `${name ? name + "の" : ""}今日の運勢`;
+  const r = document.createElement("div");
+  r.className = "rank";
+  r.textContent = `【${rank}】`;
+  const body = document.createElement("div");
+  body.textContent = `${msg}\nラッキーアイテム：${lucky}`;
+  res.append(head, r, body);
+});
+document.getElementById("name").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("draw").click(); });
+</script>
+</body>
+</html>
